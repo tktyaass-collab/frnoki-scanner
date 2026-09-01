@@ -1,111 +1,86 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-
-import sys
 import os
-import platform
 import socket
 import threading
-import time
+import customtkinter as ctk
 
-# ضبط الترميز التلقائي لويندوز
-if platform.system() == "Windows":
-    try:
-        import io
-        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
-        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
-        os.system("chcp 65001 >nul")
-    except Exception:
-        pass
+# Clean terminal encoding setup for the background terminal
+if os.name == 'nt':
+    os.system('chcp 65001 > nul')
 
-def launch_gui_interface():
-    try:
-        import customtkinter as ctk
-        
-        ctk.set_appearance_mode("Dark")
-        ctk.set_default_color_theme("blue")
-        
-        root = ctk.CTk()
-        root.geometry("720x530")
-        root.title("FRNOKI Scanner - Cyber Dashboard v2.0")
-        root.resizable(False, False)
-        
-        # إطار رئيسي
-        main_frame = ctk.CTkFrame(root, fg_color="transparent")
-        main_frame.pack(fill="both", expand=True, padx=20, pady=20)
-        
-        # العنوان العلوي بالإنجليزية المنظمة
-        title_label = ctk.CTkLabel(
-            main_frame, 
-            text="FRNOKI ADVANCED NETWORK SCANNER", 
-            font=("Consolas", 18, "bold")
-        )
-        title_label.pack(pady=(0, 15))
-        
-        # إطار التحكم والإدخال
-        control_frame = ctk.CTkFrame(main_frame, corner_radius=10)
-        control_frame.pack(fill="x", padx=0, pady=5)
-        
-        lbl_target = ctk.CTkLabel(control_frame, text="Target IP:", font=("Consolas", 13, "bold"))
-        lbl_target.grid(row=0, column=0, padx=15, pady=15, sticky="w")
-        
-        entry_target = ctk.CTkEntry(control_frame, width=300, height=38, placeholder_text="127.0.0.1", font=("Consolas", 13))
-        entry_target.grid(row=0, column=1, padx=10, pady=15, sticky="ew")
-        entry_target.insert(0, "127.0.0.1")
-        
-        btn_scan = ctk.CTkButton(
-            control_frame, 
-            text="Start Scan", 
-            command=lambda: execute_gui_scan(),
-            width=130,
-            height=38,
-            fg_color="#1f538d", 
-            hover_color="#14375e",
-            font=("Consolas", 13, "bold")
-        )
-        btn_scan.grid(row=0, column=2, padx=15, pady=15, sticky="e")
-        control_frame.columnconfigure(1, weight=1)
+def show_cli_banner():
+    print("\n" + "="*50)
+    print(" "*15 + "FRNOKI SCANNER")
+    print("="*50)
+    print("[+] Welcome to FRNOKI Network Scanner")
+    print("[+] CLI initialized successfully")
+    print("[+] Launching Arabic Graphical User Interface...")
+    print("="*50 + "\n")
 
-        # شاشة المخرجات (Console Output)
-        text_output = ctk.CTkTextbox(main_frame, width=670, height=290, font=("Consolas", 12))
-        text_output.pack(pady=15, fill="both", expand=True)
-        text_output.insert("0.0", "[*] System initialized successfully...\n[*] Ready to scan target ports.\n\n")
+# GUI Theme Setup
+ctk.set_appearance_mode("Dark")
+ctk.set_default_color_theme("blue")
+
+class ScannerApp(ctk.CTk):
+    def __init__(self):
+        super().__init__()
         
-        def execute_gui_scan():
-            target = entry_target.get().strip()
-            if not target:
-                target = "127.0.0.1"
-            
-            text_output.insert("end", f"[*] Starting port scan on target: {target}...\n")
-            text_output.see("end")
-            
-            def background_scan():
-                common_ports = [21, 22, 80, 443, 3306, 8080]
-                found = []
-                for p in common_ports:
-                    try:
-                        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                        s.settimeout(0.7)
-                        if s.connect_ex((target, p)) == 0:
-                            found.append(str(p))
-                        s.close()
-                    except:
-                        pass
-                
-                if found:
-                    result_str = f"[+] OPEN PORTS FOUND: {', '.join(found)}\n"
+        self.title("أداة فحص الشبكة - FRNOKI")
+        self.geometry("700x500")
+        self.resizable(False, False)
+        
+        # العنوان الرئيسي
+        self.title_label = ctk.CTkLabel(self, text="فاحص المنافذ والشبكات", font=("Arial", 22, "bold"))
+        self.title_label.pack(pady=15)
+        
+        # حقل إدخال الهدف (IP)
+        self.target_frame = ctk.CTkFrame(self, fg_color="transparent")
+        self.target_frame.pack(pady=5, fill="x", padx=30)
+        
+        self.target_label = ctk.CTkLabel(self.target_frame, text=":عنوان الهدف (IP)", font=("Arial", 14))
+        self.target_label.pack(side="right", padx=5)
+        
+        self.target_entry = ctk.CTkEntry(self.target_frame, width=350, justify="right", font=("Arial", 14))
+        self.target_entry.pack(side="right", padx=5)
+        self.target_entry.insert(0, "127.0.0.1")
+        
+        # زر بدء الفحص
+        self.scan_btn = ctk.CTkButton(self, text="بدء الفحص", font=("Arial", 16, "bold"), fg_color="#2b9348", hover_color="#55a630", command=self.start_scan_thread)
+        self.scan_btn.pack(pady=15)
+        
+        # صندوق عرض النتائج
+        self.output_box = ctk.CTkTextbox(self, width=620, height=230, font=("Consolas", 12))
+        self.output_box.pack(pady=5)
+        self.output_box.insert("0.0", "جاهز لبدء عملية الفحص...\n")
+
+    def log_message(self, message):
+        self.output_box.insert("end", message + "\n")
+        self.output_box.see("end")
+
+    def start_scan_thread(self):
+        target = self.target_entry.get().strip()
+        self.output_box.delete("0.0", "end")
+        self.log_message(f"جاري فحص الهدف: {target} ...")
+        
+        threading.Thread(target=self.run_scan, args=(target,), daemon=True).start()
+
+    def run_scan(self, target):
+        ports = [21, 22, 23, 80, 443, 445, 3306, 8080]
+        try:
+            target_ip = socket.gethostbyname(target)
+            for port in ports:
+                s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                s.settimeout(0.5)
+                result = s.connect_ex((target_ip, port))
+                if result == 0:
+                    self.log_message(f"[مفتوح] المنفذ {port}")
                 else:
-                    result_str = f"[-] No open ports detected on standard list.\n"
-                
-                text_output.insert("end", result_str + "----------------------------------------\n")
-                text_output.see("end")
-                
-            threading.Thread(target=background_scan).start()
-
-        root.mainloop()
-        
-    except Exception as err:
-        print(f"[!] GUI Error: {err}")
+                    self.log_message(f"[مغلق] المنفذ {port}")
+                s.close()
+            self.log_message("\nتم الانتهاء من الفحص بنجاح.")
+        except Exception as e:
+            self.log_message(f"حدث خطأ: {e}")
 
 if __name__ == "__main__":
-    launch_gui_interface()
+    show_cli_banner()
+    app = ScannerApp()
+    app.mainloop()
